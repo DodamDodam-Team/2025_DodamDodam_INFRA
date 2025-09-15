@@ -19,6 +19,16 @@ terraform apply --auto-approve
     │   ├── provider.tf
     │   └── variables.tf
     │
+    ├── ecr
+    │   ├── main.tf
+    │   ├── outputs.tf
+    │   └── variables.tf
+    │
+    ├── iam
+    │   ├── main.tf
+    │   ├── provider.tf
+    │   └── variables.tf
+    │
     ├── rds
     │   ├── main.tf
     │   ├── outputs.tf
