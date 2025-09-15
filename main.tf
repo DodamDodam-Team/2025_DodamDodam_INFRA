@@ -104,3 +104,18 @@ module "secrets_manager" {
 
   secrets_manager_name = local.secrets_manager.rds_proxy.name
 }
+
+module "ecr" {
+  source = "./modules/ecr"
+
+  ecr_name = local.ecr.name
+}
+
+module "iam" {
+  source = "./modules/iam"
+  
+  github_iam_user_name = local.iam.github.name
+  ecr_name             = module.ecr.aws_ecr_repository_name
+
+  depends_on = [ module.ecr ]
+}
