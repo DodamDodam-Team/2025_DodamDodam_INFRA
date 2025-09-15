@@ -120,4 +120,14 @@ locals {
       name = "${local.parameter}-rds-credentials-secrets"
     }
   }
+
+  iam = {
+    github = {
+      name = "github-user"
+    }
+  }
+
+  ecr = {
+    name = "${local.parameter}-ecr"
+  }
 }
