@@ -11,6 +11,16 @@ terraform apply --auto-approve -parallelism=30
 ### Code Structure
 ```
 ├── Infra
+│   ├── src
+│   │   ├── asg
+│   │   │   └── userdata.sh
+│   │   │
+│   │   ├── bastion
+│   │   │   └── userdata.sh
+│   │   │
+│   │   └── jenkins
+│   │       └── userdata.sh
+│   │  
 │   ├── locals.tf
 │   ├── main.tf
 │   ├── provider.tf
