@@ -1,6 +1,9 @@
 #!/bin/bash
 yum update -y
 yum install --allowerasing -y jq curl wget unzip
+dnf install -y mariadb105
+dnf install -y redis7
+
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
