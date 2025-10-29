@@ -48,25 +48,30 @@ resource "aws_elasticache_parameter_group" "this" {
       value = parameter.value.value
     }
   }
-  
+
   tags = {
     Name = var.parameter_group_name
   }
 }
 
-resource "aws_elasticache_cluster" "this" {
-  cluster_id                 = var.name
-  engine                     = var.engine
-  engine_version             = var.engine_version
-  node_type                  = var.node_type
-  num_cache_nodes            = var.num_cache_nodes
-  az_mode                    = var.az_mode
-  parameter_group_name       = aws_elasticache_parameter_group.this.name
-  subnet_group_name          = aws_elasticache_subnet_group.this.name
-  security_group_ids         = [aws_security_group.this.id]
-
-  apply_immediately          = var.apply_immediately
-  port                       = var.port
+resource "aws_elasticache_replication_group" "this" {
+  replication_group_id        = var.name
+  description                 = var.name
+  node_type                   = var.node_type
+  engine                      = var.engine
+  engine_version              = var.engine_version
+  num_node_groups             = var.num_node_groups
+  replicas_per_node_group     = var.replicas_per_node_group
+  automatic_failover_enabled  = var.automatic_failover_enabled
+  multi_az_enabled            = var.multi_az_enabled
+  apply_immediately           = var.apply_immediately
+  at_rest_encryption_enabled  = var.at_rest_encryption_enabled
+  port                        = var.port
+  security_group_ids          = [aws_security_group.this.id]
+  subnet_group_name           = aws_elasticache_subnet_group.this.name
+  parameter_group_name        = aws_elasticache_parameter_group.this.name
+  transit_encryption_enabled  = var.transit_encryption_enabled
+  transit_encryption_mode     = var.transit_encryption_mode
 
   tags = {
     Name = var.name
