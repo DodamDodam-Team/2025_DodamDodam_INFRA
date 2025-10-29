@@ -26,10 +26,8 @@ echo 'Null25##' | passwd --stdin root
 
 AUTH_FILE="/home/ec2-user/.google_authenticator"
 MFA_KEY=$(grep -m 1 "^[A-Z2-7]*$" "$AUTH_FILE")
-SECRET_NAME="bastion-mfa-key"
+SECRET_NAME="dodam-bastion-mfa-key"
 SECRET_JSON="{\"MFAKey\":\"$MFA_KEY\"}"
 REGION_CODE="ap-northeast-2"
 
 aws secretsmanager put-secret-value --secret-id "$SECRET_NAME" --secret-string "$SECRET_JSON" --region "$REGION_CODE"
-
-# rm -f "$AUTH_FILE"

@@ -163,18 +163,24 @@ module "elaticache" {
   protect_subnet_ids            = module.vpc[each.value.vpc_name].protect_subnet_ids
   name                          = each.key
 
+  node_type                     = each.value.node_type
   engine                        = each.value.engine
   engine_version                = each.value.engine_version
-  node_type                     = each.value.node_type
   port                          = each.value.port
-  num_cache_nodes               = each.value.num_cache_nodes
-  az_mode                       = each.value.az_mode
+  num_node_groups               = each.value.num_node_groups
+  replicas_per_node_group       = each.value.replicas_per_node_group
+  automatic_failover_enabled    = each.value.automatic_failover_enabled
+  multi_az_enabled              = each.value.multi_az_enabled
   apply_immediately             = each.value.apply_immediately
+  at_rest_encryption_enabled    = each.value.at_rest_encryption_enabled
+  transit_encryption_enabled    = each.value.transit_encryption_enabled
+  transit_encryption_mode       = each.value.transit_encryption_mode
 
   subnet_group_name             = each.value.subnet_group_name
 
   parameter_group_name          = each.value.parameter_group_name
   parameter_group_family        = each.value.parameter_group_family
+  parameters                    = each.value.parameters
 
   security_group_name           = each.value.security_group_name
   ingress_ports                 = each.value.ingress_ports
@@ -217,7 +223,7 @@ module "rds" {
   cluster_parameter_group_name   = each.value.cluster_parameter_group_name
   cluster_parameter_group_family = each.value.cluster_parameter_group_family
   parameters                     = each.value.parameters
-  cluster_parameter_group_tags   = each.value.cluster_parmeter_group_tags
+  cluster_parameter_group_tags   = each.value.cluster_parameter_group_tags
 
   parameter_group_name           = each.value.parameter_group_name
   parameter_group_family         = each.value.parameter_group_family
@@ -230,6 +236,7 @@ module "rds" {
 }
 
 module "secrets_manager" {
+  depends_on = [ module.rds, module.elaticache ]
   source = "./modules/secrets-manager"
 
   for_each = local.secrets_managers
@@ -237,12 +244,14 @@ module "secrets_manager" {
   name = each.value.name
 
   secret_values = (
-    can(each.value.enable_values) ? {
-      DB_USER     = module.rds[each.value.rds_name].rds_user_name
-      DB_PASSWORD = module.rds[each.value.rds_name].rds_user_password
-      DB_ADDRESS  = module.rds[each.value.rds_name].rds_address
-      DB_PORT     = module.rds[each.value.rds_name].rds_port
-      DB_NAME     = module.rds[each.value.rds_name].rds_db_name
+    each.value.enable_values ? {
+      RDS_DB_USER     = module.rds[each.value.rds_name].rds_user_name
+      RDS_DB_PASSWORD = module.rds[each.value.rds_name].rds_user_password
+      RDS_DB_ADDRESS  = module.rds[each.value.rds_name].rds_address
+      RDS_DB_PORT     = module.rds[each.value.rds_name].rds_port
+      RDS_DB_NAME     = module.rds[each.value.rds_name].rds_db_name
+      REDIS_ENDPOINT  = module.elaticache[each.value.elaticache_name].elaticache_address
+      REDIS_PORT      = module.elaticache[each.value.elaticache_name].elaticache_port
     }
     : {}
   )

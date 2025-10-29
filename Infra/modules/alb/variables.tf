@@ -37,6 +37,7 @@ variable "target_groups" {
     protocol             = string
     target_type          = string
     deregistration_delay = number
+    tags                 = map(string)
 
     health_check = object({
       protocol            = string

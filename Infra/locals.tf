@@ -55,6 +55,17 @@ locals {
             Name = "${local.parameter}-natgw-$1"
           }
         },
+        {
+          type         = "protect"
+          sn_cidrs     = ["10.0.4.0/24", "10.0.5.0/24"]
+          sn_tags      = {
+            Name = "${local.parameter}-protect-$1"
+          }
+
+          rtb_tags     = {
+            Name = "${local.parameter}-protect-rtb"
+          }
+        },
       ]
     }
   }
@@ -72,7 +83,7 @@ locals {
       
       security_group_name     = "${local.parameter}-bastion-sg"
       instance_type           = "t2.micro"
-      userdata                = "/bastion/userdata.sh"
+      userdata                = "/ec2/bastion/userdata.sh"
       
       enable_public_ip        = true
       enable_eip              = true
@@ -96,10 +107,10 @@ locals {
       keypair_name          = "${local.parameter}"
       keypair_file_path     = "${path.cwd}/${local.parameter}.pem"
 
-      enable_create_iam_role = false
+      enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-bastion-role"
       instance_profile_name = "${local.parameter}-bastion-profile"
-      iam_policies          = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      iam_policies          = ["arn:aws:iam::aws:policy/SecretsManagerReadWrite"]
     },
     "${local.parameter}-jenkins-ec2" = {
       vpc_name                = "${local.parameter}-vpc"
@@ -111,7 +122,7 @@ locals {
       
       security_group_name     = "${local.parameter}-jenkins-sg"
       instance_type           = "t2.micro"
-      userdata                = "/jenkins/userdata.sh"
+      userdata                = "/ec2/jenkins/userdata.sh"
       
       enable_public_ip        = false
       enable_eip              = false
@@ -121,10 +132,10 @@ locals {
 
       ingress_ports = [
         { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
 
       egress_ports = [
-        { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"}
       ]
@@ -167,8 +178,8 @@ locals {
 
           health_check = {
             protocol            = "HTTP"
-            path                = "/healthcheck"
-            port                = 80
+            path                = "/"
+            port                = 8080
             interval            = 5
             timeout             = 2
             healthy_threshold   = 2
@@ -183,7 +194,7 @@ locals {
         {
           type                  = "ec2"
           target_group_name     = "${local.parameter}-app-alb-tg"
-          target_name           = "${local.parameter}-bastion"
+          target_name           = "${local.parameter}-app-ec2"
           target_port           = 80
         },
       ]
@@ -236,7 +247,7 @@ locals {
         }
       ]
 
-      enable_attach_target      = false
+      enable_attach_target      = true
       targets = [
         {
           type                  = "ec2"
@@ -274,7 +285,7 @@ locals {
       enable_monitoring = true
 
       instance_type = "t2.micro"
-      userdata      = "/asg/userdata.sh"
+      userdata      = "/ec2/asg/userdata.sh"
 
       block_device_mappings = [
         {
@@ -314,10 +325,10 @@ locals {
       keypair_name          = "${local.parameter}"
       keypair_file_path     = "${path.cwd}/${local.parameter}.pem"
 
-      enable_create_iam_role = false
+      enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-asg-role"
       instance_profile_name = "${local.parameter}-asg-profile"
-      iam_policies          = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      iam_policies          = ["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
     },
   }
 }
@@ -351,7 +362,7 @@ locals {
 
       launch_template_name       = "${local.parameter}-app-lt"
       
-      enable_attach_elb          = false
+      enable_attach_elb          = true
       elb_name                   = "${local.parameter}-app-alb"
       elb_target_group_name      = "${local.parameter}-app-alb-tg"
       
@@ -412,27 +423,28 @@ locals {
     "${local.parameter}-redis-cluster" = {
       vpc_name                        = "${local.parameter}-vpc"
 
+      node_type                       = "cache.t4g.small"
       engine                          = "redis"
       engine_version                  = "7.1"
-      node_type                       = "cache.t4g.small"
-      az_mode                         = "single-az"
-      num_cache_nodes                 = 1
       port                            = 16379
+      num_node_groups                 = 2
+      replicas_per_node_group         = 1
+  
+      automatic_failover_enabled      = true
+      multi_az_enabled                = true
       apply_immediately               = true
+      at_rest_encryption_enabled      = true
+      transit_encryption_enabled      = true
+      transit_encryption_mode         = "preferred" # required
 
       subnet_group_name               = "${local.parameter}-redis-sg"
-
       parameter_group_name            = "${local.parameter}-redis-pg"
       parameter_group_family          = "redis7"
       parameters = [
         {
-          name  = "idle_timeout"
-          value = 60
-        },
-        {
           name  = "latency-tracking"
           value = "yes"
-        }
+        },
       ]
 
       security_group_name             = "${local.parameter}-redis-sg"
@@ -517,10 +529,11 @@ locals {
 
 locals {
   secrets_managers = {
-    rds = {
+    db = {
       enable_values = true
-      name          = "${local.parameter}-rds-secrets"
+      name          = "${local.parameter}-db-secrets"
       rds_name      = "${local.parameter}-db-cluster"
+      elaticache_name = "${local.parameter}-redis-cluster"
     }
     mfa = {
       enable_values = false

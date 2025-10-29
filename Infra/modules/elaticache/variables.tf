@@ -27,6 +27,10 @@ variable "parameters" {
   default = []
 }
 
+variable "node_type" {
+  type = string
+}
+
 variable "engine" {
   type = string
 }
@@ -35,19 +39,35 @@ variable "engine_version" {
   type = string
 }
 
-variable "node_type" {
-  type = string
-}
-
-variable "num_cache_nodes" {
-  type = number
-}
-
 variable "port" {
   type = number
 }
 
-variable "az_mode" {
+variable "automatic_failover_enabled" {
+  type = bool
+}
+
+variable "num_node_groups" {
+  type = number
+}
+
+variable "replicas_per_node_group" {
+  type = number
+}
+
+variable "multi_az_enabled" {
+  type = bool
+}
+
+variable "at_rest_encryption_enabled" {
+  type = bool
+}
+
+variable "transit_encryption_enabled" {
+  type = bool
+}
+
+variable "transit_encryption_mode" {
   type = string
 }
 
