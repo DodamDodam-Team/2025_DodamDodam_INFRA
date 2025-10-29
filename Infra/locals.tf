@@ -441,10 +441,8 @@ locals {
       parameter_group_name            = "${local.parameter}-redis-pg"
       parameter_group_family          = "redis7"
       parameters = [
-        {
-          name  = "latency-tracking"
-          value = "yes"
-        },
+        {name  = "latency-tracking", value = "yes"},
+        {name  = "cluster-enabled", value = "yes"}
       ]
 
       security_group_name             = "${local.parameter}-redis-sg"
