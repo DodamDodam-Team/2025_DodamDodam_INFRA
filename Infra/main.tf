@@ -16,7 +16,7 @@ module "vpc" {
 }
 
 module "ec2" {
-  depends_on = [ module.vpc ]
+  depends_on = [ module.vpc, module.secrets_manager ]
 
   source = "./modules/ec2"
 
@@ -26,7 +26,6 @@ module "ec2" {
   subnet_id             = module.vpc[each.value.vpc_name].subnet_ids[each.value.subnet_name]
   name                  = each.key
 
-  security_group_name   = each.value.security_group_name
   instance_type         = each.value.instance_type
   userdata              = each.value.userdata
   instance_tags         = each.value.instance_tags
@@ -35,6 +34,10 @@ module "ec2" {
   enable_eip            = each.value.enable_eip
   eip_tags              = each.value.eip_tags
 
+  root_block_device     = each.value.root_block_device
+
+  security_group_name   = each.value.security_group_name
+  security_group_tags   = each.value.security_group_tags
   ingress_ports         = each.value.ingress_ports
   egress_ports          = each.value.egress_ports
 
@@ -255,4 +258,22 @@ module "secrets_manager" {
     }
     : {}
   )
+}
+
+module "iam" {
+  source = "./modules/iam"
+
+  for_each = local.iams
+
+  user_name             = each.key
+  user_tags             = each.value.user_tags
+  service_name          = each.value.service_name
+  statements            = each.value.statements
+  enable_inline_policy  = each.value.enable_inline_policy
+  inline_policy_name    = each.value.inline_policy_name
+  enable_custom_policy  = each.value.enable_custom_policy
+  policy_name           = each.value.policy_name
+  policy_tags           = each.value.policy_tags
+  enable_managed_policy = each.value.enable_managed_policy
+  managed_policy_arns   = each.value.managed_policy_arns
 }
