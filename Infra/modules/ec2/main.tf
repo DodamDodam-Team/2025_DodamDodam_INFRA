@@ -24,10 +24,11 @@ resource "aws_instance" "this" {
   vpc_security_group_ids      = [aws_security_group.this.id]
   associate_public_ip_address = var.enable_public_ip
   iam_instance_profile        = var.enable_create_iam_role ? aws_iam_instance_profile.this[0].name : null
+
   root_block_device {
-    volume_size               = 10
-    volume_type               = "gp3"
-    delete_on_termination     = true
+    volume_size           = var.root_block_device.volume_size
+    volume_type           = var.root_block_device.volume_type
+    delete_on_termination = var.root_block_device.delete_on_termination
   }
 
   user_data = file("${path.module}/../../src/${var.userdata}")
@@ -59,9 +60,7 @@ resource "aws_security_group" "this" {
     }
   }
 
-  tags = {
-    Name = var.security_group_name
-  }
+  tags = var.security_group_tags
 }
 
 resource "aws_iam_role" "this" {

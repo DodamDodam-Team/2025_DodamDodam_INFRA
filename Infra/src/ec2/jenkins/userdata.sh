@@ -25,10 +25,11 @@ sudo systemctl enable --now jenkins
 
 JENKINS_DEFAULT_ADMIN_PASSWORD=$(sudo cat /var/lib/jenkins/secrets/initialAdminPassword)
 JENKINS_URL="http://localhost:8080"
+USER_ID="admin"
 
-wget "${JENKINS_URL}jnlpJars/jenkins-cli.jar" -O jenkins-cli.jar
+wget $JENKINS_URL/jnlpJars/jenkins-cli.jar
 
-java -jar jenkins-cli.jar -s "${JENKINS_URL}" -auth "${USER_ID}":"${JENKINS_DEFAULT_ADMIN_PASSWORD}" groovy = <<EOF
+java -jar jenkins-cli.jar -s "${JENKINS_URL}" -auth "$USER_ID:$JENKINS_DEFAULT_ADMIN_PASSWORD" groovy = <<EOF
 import jenkins.model.*
 import hudson.model.User
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
