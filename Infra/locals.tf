@@ -81,7 +81,6 @@ locals {
         Name = "${local.parameter}-bastion-ec2"
       }
       
-      security_group_name     = "${local.parameter}-bastion-sg"
       instance_type           = "t2.micro"
       userdata                = "/ec2/bastion/userdata.sh"
       
@@ -91,6 +90,16 @@ locals {
         Name = "${local.parameter}-bastion-eip"
       }
 
+      root_block_device = {
+        volume_size           = 30
+        volume_type           = "gp3"
+        delete_on_termination = true
+      }
+
+      security_group_name     = "${local.parameter}-bastion-sg"
+      security_group_tags = {
+        Name = "${local.parameter}-bastion-sg"
+      }
       ingress_ports = [
         { from_port = 5202, to_port = 5202, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
@@ -110,7 +119,7 @@ locals {
       enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-bastion-role"
       instance_profile_name = "${local.parameter}-bastion-profile"
-      iam_policies          = ["arn:aws:iam::aws:policy/SecretsManagerReadWrite"]
+      iam_policies          = ["arn:aws:iam::aws:policy/SecretsManagerReadWrite", "arn:aws:iam::aws:policy/AmazonSSMFullAccess"]
     },
     "${local.parameter}-jenkins-ec2" = {
       vpc_name                = "${local.parameter}-vpc"
@@ -120,7 +129,6 @@ locals {
         Name = "${local.parameter}-jenkins-ec2"
       }
       
-      security_group_name     = "${local.parameter}-jenkins-sg"
       instance_type           = "t2.micro"
       userdata                = "/ec2/jenkins/userdata.sh"
       
@@ -130,6 +138,16 @@ locals {
         Name = "${local.parameter}-jenkins-eip"
       }
 
+      root_block_device = {
+        volume_size           = 30
+        volume_type           = "gp3"
+        delete_on_termination = true
+      }
+
+      security_group_name     = "${local.parameter}-jenkins-sg"
+      security_group_tags = {
+        Name = "${local.parameter}-jenkins-sg"
+      }
       ingress_ports = [
         { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
@@ -168,7 +186,7 @@ locals {
       target_groups = [
         {
           name                  = "${local.parameter}-app-alb-tg"
-          port                  = 80
+          port                  = 8080
           protocol              = "HTTP"
           target_type           = "instance"
           deregistration_delay  = 30
@@ -218,7 +236,7 @@ locals {
       alb_tags = {
         Name = "${local.parameter}-jenkins-alb"
       }
-      internal                  = true
+      internal                  = false
       port                      = 80
       protocol                  = "HTTP"
       listener_target_groups    = ["${local.parameter}-jenkins-alb-tg"]
@@ -226,7 +244,7 @@ locals {
       target_groups = [
         {
           name                  = "${local.parameter}-jenkins-alb-tg"
-          port                  = 80
+          port                  = 8080
           protocol              = "HTTP"
           target_type           = "instance"
           deregistration_delay  = 30
@@ -236,8 +254,8 @@ locals {
 
           health_check = {
             protocol            = "HTTP"
-            path                = "/"
-            port                = 80
+            path                = "/login"
+            port                = 8080
             interval            = 5
             timeout             = 2
             healthy_threshold   = 2
@@ -253,7 +271,7 @@ locals {
           type                  = "ec2"
           target_group_name     = "${local.parameter}-jenkins-alb-tg"
           target_name           = "${local.parameter}-jenkins-ec2"
-          target_port           = 80
+          target_port           = 8080
         },
       ]
 
@@ -291,7 +309,7 @@ locals {
         {
           device_name = "/dev/xvda" # /dev/sdh or /dev/xvda
           ebs = {
-            volume_size           = 10
+            volume_size           = 30
             volume_type           = "gp3"
             delete_on_termination = true
           }
@@ -328,7 +346,7 @@ locals {
       enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-asg-role"
       instance_profile_name = "${local.parameter}-asg-profile"
-      iam_policies          = ["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
+      iam_policies          = ["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess", "arn:aws:iam::aws:policy/AmazonSSMFullAccess"]
     },
   }
 }
@@ -537,5 +555,36 @@ locals {
       enable_values = false
       name          = "${local.parameter}-bastion-mfa-key"
     }
+  }
+}
+
+locals {
+  iams = {
+    "cicd-user" = {
+      user_tags = {Name = "cicd-user"}
+      service_name = "iam"
+
+      statements = [
+        {
+          effect    = "Allow"
+          actions   = [
+            "ecr:*",
+            "ec2:*",
+          ]
+          resources = ["*"]
+          conditions = []
+        }
+      ]
+
+      enable_inline_policy  = true
+      inline_policy_name    = "iam-inline-policy"
+
+      enable_custom_policy  = false
+      policy_name           = "cicd-push-policy"
+      policy_tags = {Name = "cicd-push-policy"}
+
+      enable_managed_policy  = false
+      managed_policy_arns    = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+    },
   }
 }
