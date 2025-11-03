@@ -15,9 +15,11 @@ yum install -y docker
 systemctl enable --now docker
 usermod -aG docker ec2-user
 usermod -aG docker root
+usermod -aG docker jenkins
 chmod 666 /var/run/docker.sock
 
 sudo dnf install -y java-17-amazon-corretto
+sudo yum install -y java-17-amazon-corretto-devel
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
 sudo dnf install -y jenkins
