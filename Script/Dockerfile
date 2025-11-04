@@ -1,4 +1,4 @@
-FROM openjdk:17-jdk-alpine
+FROM amazoncorretto:17-alpine
 WORKDIR /app
 COPY build/libs/*.jar ./app.jar
 RUN apk add --no-cache curl
