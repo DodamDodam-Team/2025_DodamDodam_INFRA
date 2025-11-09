@@ -18,7 +18,7 @@ sudo sed -i '10i\ChallengeResponseAuthentication yes' /etc/ssh/sshd_config.d/50-
 sudo sed -i '22i\AuthenticationMethods publickey,keyboard-interactive' /etc/ssh/sshd_config.d/50-redhat.conf
 sudo -u ec2-user bash -c "google-authenticator -t -f -d -w 17 -r 3 -R 30 -Q UTF8 -q"
 
-sed -i 's|PasswordAuthentication no|PasswordAuthentication yes|g' /etc/ssh/sshd_config
+sed -i 's|PasswordAuthentication no|PasswordAuthentication yes|' /etc/ssh/sshd_config
 echo 'Port 5202' >> /etc/ssh/sshd_config
 systemctl restart sshd
 echo 'Null25##' | passwd --stdin ec2-user
