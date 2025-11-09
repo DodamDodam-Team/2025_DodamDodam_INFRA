@@ -151,6 +151,7 @@ locals {
       ingress_ports = [
         { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
 
       egress_ports = [
@@ -165,6 +166,55 @@ locals {
       enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-jenkins-role"
       instance_profile_name = "${local.parameter}-jenkins-profile"
+      iam_policies          = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+    },
+    "${local.parameter}-monitoring-ec2" = {
+      vpc_name                = "${local.parameter}-vpc"
+      subnet_name             = "${local.parameter}-private-a"
+
+      instance_tags = {
+        Name = "${local.parameter}-monitoring-ec2"
+      }
+      
+      instance_type           = "t2.micro"
+      userdata                = "/ec2/monitoring/userdata.sh"
+      
+      enable_public_ip        = false
+      enable_eip              = false
+      eip_tags = {
+        Name = "${local.parameter}-monitoring-eip"
+      }
+
+      root_block_device = {
+        volume_size           = 30
+        volume_type           = "gp3"
+        delete_on_termination = true
+      }
+
+      security_group_name     = "${local.parameter}-monitoring-sg"
+      security_group_tags = {
+        Name = "${local.parameter}-monitoring-sg"
+      }
+      ingress_ports = [
+        { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 3000, to_port = 3000, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 9090, to_port = 9090, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        # { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+      ]
+
+      egress_ports = [
+        { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+      ]
+      
+      enable_create_keypair = false
+      keypair_name          = "${local.parameter}"
+      keypair_file_path     = "${path.cwd}/${local.parameter}.pem"
+
+      enable_create_iam_role = true
+      iam_role_name         = "${local.parameter}-monitoring-role"
+      instance_profile_name = "${local.parameter}-monitoring-profile"
       iam_policies          = ["arn:aws:iam::aws:policy/AdministratorAccess"]
     },
   }
@@ -196,7 +246,7 @@ locals {
 
           health_check = {
             protocol            = "HTTP"
-            path                = "/"
+            path                = "/healthcheck"
             port                = 8080
             interval            = 5
             timeout             = 2
@@ -249,7 +299,7 @@ locals {
           target_type           = "instance"
           deregistration_delay  = 30
           tags = {
-            Name = "${local.parameter}-alb-tg"
+            Name = "${local.parameter}-jenkins-alb-tg"
           }
 
           health_check = {
@@ -287,7 +337,94 @@ locals {
       egress_ports = [
         { from_port = 0, to_port = 0, protocol = "-1", cidr_block = "0.0.0.0/0"},
       ]
-    }
+    },
+    "${local.parameter}-monitoring-alb" = {
+      vpc_name                = "${local.parameter}-vpc"
+
+      alb_tags = {
+        Name = "${local.parameter}-monitoring-alb"
+      }
+      internal                  = false
+      port                      = 3000
+      protocol                  = "HTTP"
+      listener_target_groups    = ["${local.parameter}-monitoring-alb-tg"]
+
+      target_groups = [
+        {
+          name                  = "${local.parameter}-grafana-alb-tg"
+          port                  = 3000
+          protocol              = "HTTP"
+          target_type           = "instance"
+          deregistration_delay  = 30
+          tags = {
+            Name = "${local.parameter}-grafana-alb-tg"
+          }
+
+          health_check = {
+            protocol            = "HTTP"
+            path                = "/login"
+            port                = 3000
+            interval            = 5
+            timeout             = 2
+            healthy_threshold   = 2
+            unhealthy_threshold = 2
+            matcher             = "200-399"
+          }
+        },
+        {
+          name                  = "${local.parameter}-prometheus-alb-tg"
+          port                  = 9090
+          protocol              = "HTTP"
+          target_type           = "instance"
+          deregistration_delay  = 30
+          tags = {
+            Name = "${local.parameter}-prometheus-alb-tg"
+          }
+
+          health_check = {
+            protocol            = "HTTP"
+            path                = "/"
+            port                = 9090
+            interval            = 5
+            timeout             = 2
+            healthy_threshold   = 2
+            unhealthy_threshold = 2
+            matcher             = "200-399"
+          }
+        }
+      ]
+
+      enable_attach_target      = true
+      targets = [
+        {
+          type                  = "ec2"
+          target_group_name     = "${local.parameter}-monitoring-alb-tg"
+          target_name           = "${local.parameter}-monitoring-ec2"
+          target_port           = 3000
+        },
+        {
+          type                  = "ec2"
+          target_group_name     = "${local.parameter}-monitoring-alb-tg"
+          target_name           = "${local.parameter}-monitoring-ec2"
+          target_port           = 9090
+        },
+
+      ]
+
+      security_group_name     = "${local.parameter}-monitoring-alb-sg"
+      security_group_tags = {
+        Name = "${local.parameter}-monitoring-alb-sg"
+      }
+
+      ingress_ports = [
+        { from_port = 3000, to_port = 3000, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 9090, to_port = 9090, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+      ]
+
+      egress_ports = [
+        { from_port = 0, to_port = 0, protocol = "-1", cidr_block = "0.0.0.0/0"},
+      ]
+    },
   }
 }
 
@@ -336,7 +473,8 @@ locals {
         { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 13306, to_port = 13306, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 16379, to_port = 16379, protocol = "tcp", cidr_block = "0.0.0.0/0"}
+        { from_port = 16379, to_port = 16379, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
       
       enable_create_keypair = false
@@ -346,7 +484,7 @@ locals {
       enable_create_iam_role = true
       iam_role_name         = "${local.parameter}-asg-role"
       instance_profile_name = "${local.parameter}-asg-profile"
-      iam_policies          = ["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess", "arn:aws:iam::aws:policy/AmazonSSMFullAccess"]
+      iam_policies          = ["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess", "arn:aws:iam::aws:policy/AmazonSSMFullAccess", "arn:aws:iam::aws:policy/SecretsManagerReadWrite"]
     },
   }
 }
