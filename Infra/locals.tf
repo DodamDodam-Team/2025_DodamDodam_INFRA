@@ -151,7 +151,6 @@ locals {
       ingress_ports = [
         { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
 
       egress_ports = [
@@ -197,15 +196,12 @@ locals {
       }
       ingress_ports = [
         { from_port = 22, to_port = 22, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 3000, to_port = 3000, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 9090, to_port = 9090, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         # { from_port = 8080, to_port = 8080, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
 
       egress_ports = [
         { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"}
       ]
       
       enable_create_keypair = false
@@ -345,46 +341,25 @@ locals {
         Name = "${local.parameter}-monitoring-alb"
       }
       internal                  = false
-      port                      = 3000
+      port                      = 80
       protocol                  = "HTTP"
       listener_target_groups    = ["${local.parameter}-monitoring-alb-tg"]
 
       target_groups = [
         {
-          name                  = "${local.parameter}-grafana-alb-tg"
-          port                  = 3000
+          name                  = "${local.parameter}-monitoring-alb-tg"
+          port                  = 8080
           protocol              = "HTTP"
           target_type           = "instance"
           deregistration_delay  = 30
           tags = {
-            Name = "${local.parameter}-grafana-alb-tg"
+            Name = "${local.parameter}-monitoring-alb-tg"
           }
 
           health_check = {
             protocol            = "HTTP"
             path                = "/login"
             port                = 3000
-            interval            = 5
-            timeout             = 2
-            healthy_threshold   = 2
-            unhealthy_threshold = 2
-            matcher             = "200-399"
-          }
-        },
-        {
-          name                  = "${local.parameter}-prometheus-alb-tg"
-          port                  = 9090
-          protocol              = "HTTP"
-          target_type           = "instance"
-          deregistration_delay  = 30
-          tags = {
-            Name = "${local.parameter}-prometheus-alb-tg"
-          }
-
-          health_check = {
-            protocol            = "HTTP"
-            path                = "/"
-            port                = 9090
             interval            = 5
             timeout             = 2
             healthy_threshold   = 2
@@ -402,13 +377,6 @@ locals {
           target_name           = "${local.parameter}-monitoring-ec2"
           target_port           = 3000
         },
-        {
-          type                  = "ec2"
-          target_group_name     = "${local.parameter}-monitoring-alb-tg"
-          target_name           = "${local.parameter}-monitoring-ec2"
-          target_port           = 9090
-        },
-
       ]
 
       security_group_name     = "${local.parameter}-monitoring-alb-sg"
@@ -417,8 +385,7 @@ locals {
       }
 
       ingress_ports = [
-        { from_port = 3000, to_port = 3000, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 9090, to_port = 9090, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
       ]
 
       egress_ports = [
@@ -473,8 +440,7 @@ locals {
         { from_port = 80, to_port = 80, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 443, to_port = 443, protocol = "tcp", cidr_block = "0.0.0.0/0"},
         { from_port = 13306, to_port = 13306, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 16379, to_port = 16379, protocol = "tcp", cidr_block = "0.0.0.0/0"},
-        { from_port = 9100, to_port = 9100, protocol = "tcp", cidr_block = "0.0.0.0/0"},
+        { from_port = 16379, to_port = 16379, protocol = "tcp", cidr_block = "0.0.0.0/0"}
       ]
       
       enable_create_keypair = false

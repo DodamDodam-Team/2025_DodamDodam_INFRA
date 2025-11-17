@@ -5,6 +5,8 @@ pipeline {
         AWS_REGION = 'ap-northeast-2'
         ECR_REPO = 'dodam-ecr'
         EC2_NAME_TAG = 'dodam-app-ec2'
+        DB_SECRETS_MANAGER_NAME="dodam-db-secrets"
+        JWT_SECRETS_MANAGER_NAME="dodam-jwt-secrets"
     }
 
     stages {
@@ -27,6 +29,19 @@ pipeline {
             }
         }
 
+        stage('Get Environment Variable on Secrets Manager') {
+            steps {
+                script {
+                    env.RDS_DB_ADDRESS = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.DB_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .RDS_DB_ADDRESS", returnStdout: true).trim()
+                    env.RDS_DB_NAME = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.DB_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .RDS_DB_NAME", returnStdout: true).trim()
+                    env.RDS_DB_PASSWORD = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.DB_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .RDS_DB_PASSWORD", returnStdout: true).trim()
+                    env.RDS_DB_PORT = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.DB_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .RDS_DB_PORT", returnStdout: true).trim()
+                    env.RDS_DB_USER = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.DB_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .RDS_DB_USER", returnStdout: true).trim()
+                    env.JWT_SECRET_KEY = sh(script: "aws secretsmanager get-secret-value --secret-id ${env.JWT_SECRETS_MANAGER_NAME} --query SecretString --output text | jq -r .JWT_SECRET_KEY", returnStdout: true).trim()
+                }
+            }
+        }
+
         stage('Determine Next Image Tag') {
             steps {
                 script {
@@ -45,18 +60,15 @@ pipeline {
                         def semver = ~/v\d+\.\d+\.\d+/
                         def versions = existingTags.findAll { it ==~ semver }
 
-
                         if (versions && versions.size() > 0) {
-                            versions.sort { a, b ->
-                                def aParts = a.replace('v','').split('\\.').collect { it.toInteger() }
-                                def bParts = b.replace('v','').split('\\.').collect { it.toInteger() }
-                                for (int i=0; i<3; i++) {
-                                    def diff = bParts[i] - aParts[i]
-                                    if (diff != 0) return diff
-                                }
-                                return 0
+                            def latest = versions.max { tag ->
+                                def parts = tag.replace('v','').split('\\.').collect { it.toInteger() }
+                                parts[0] * 10000 + parts[1] * 100 + parts[2]
                             }
-                            def last = versions[0].replace('v','').split('\\.').collect { it.toInteger() }
+
+                            echo "Latest tag found: ${latest}"
+
+                            def last = latest.replace('v','').split('\\.').collect { it.toInteger() }
                             last[2] += 1
                             env.IMAGE_TAG = "v${last.join('.')}"
                         } else {
@@ -70,6 +82,7 @@ pipeline {
             }
         }
 
+
         stage('Build Spring Boot') {
             steps {
                 echo "Building Spring Boot App with Gradle"
@@ -78,7 +91,7 @@ pipeline {
                     chmod +x gradlew
                     export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64
                     export PATH=$JAVA_HOME/bin:$PATH
-                    ./gradlew clean build -x test -Dorg.gradle.java.home=$JAVA_HOME
+                    ./gradlew build --build-cache -x test -Dorg.gradle.java.home=$JAVA_HOME
                     '''
                 }
             }
@@ -90,8 +103,7 @@ pipeline {
                     echo "Building and Pushing Docker Image: ${env.DOCKER_IMAGE}"
                     sh """
                         docker build -t ${env.DOCKER_IMAGE} .
-                        aws ecr get-login-password --region ${env.AWS_REGION} \
-                            | docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+                        aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
                         docker push ${env.DOCKER_IMAGE}
                     """
                 }
@@ -113,7 +125,7 @@ pipeline {
                                     "docker pull ${env.DOCKER_IMAGE}",
                                     "docker stop dodam-cnt  || true",
                                     "docker rm dodam-cnt  || true",
-                                    "docker run -d -p 8080:8080 --name dodam-cnt ${env.DOCKER_IMAGE}"
+                                    "docker run -d -p 8080:8080 --name dodam-cnt -e SPRING_PROFILES_ACTIVE=prod -e SPRING_DATASOURCE_URL=\\\"jdbc:mysql://${env.RDS_DB_ADDRESS}:${env.RDS_DB_PORT}/${env.RDS_DB_NAME}?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8\\\" -e SPRING_DATASOURCE_USERNAME=\\\"${env.RDS_DB_USER}\\\" -e SPRING_DATASOURCE_PASSWORD=\\\"${env.RDS_DB_PASSWORD}\\\" -e JWT_SECRET_KEY=\\\"${env.JWT_SECRET_KEY}\\\" -e JWT_SECRET=\\\"${env.JWT_SECRET}\\\" -e JWT_SECRETKEY=\\\"${env.JWT_SECRETKEY}\\\" -e SPRING_APPLICATION_JSON=\\\"{\\\\\\\"jwt\\\\\\\":{\\\\\\\"secretKey\\\\\\\":\\\\\\\"${env.JWT_SECRET_KEY}\\\\\\\"}}\\\" ${env.DOCKER_IMAGE}"
                                 ]' \\
                                 --region ${env.AWS_REGION}
                         """,
