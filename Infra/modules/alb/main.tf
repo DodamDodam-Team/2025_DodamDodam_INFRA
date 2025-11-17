@@ -60,15 +60,25 @@ resource "aws_lb_target_group" "this" {
 }
 
 resource "aws_lb_listener" "this" {
-  for_each = { for tg in var.target_groups : tg.port => tg }
-
   load_balancer_arn = aws_lb.this.arn
-  port              = each.value.port
-  protocol          = each.value.protocol
+  port              = var.port
+  protocol          = var.protocol
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.this[each.value.name].arn
+    type = "forward"
+
+    dynamic "forward" {
+      for_each = [var.listener_target_groups]
+      content {
+        dynamic "target_group" {
+          for_each = [for tg_name in forward.value : aws_lb_target_group.this[tg_name]]
+          content {
+            arn    = target_group.value.arn
+            weight = 100 / length(forward.value)
+          }
+        }
+      }
+    }
   }
 }
 
